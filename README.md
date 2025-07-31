@@ -8,7 +8,7 @@
 <br>
 
 <p align="center">
-  <img src="asset/needlechain.png" width="500"/>
+  <img src="asset/needlechain.png" width="800"/>
 </p>
 
 NeedleChain is a benchmark designed to evaluate LLMs' intact long-context understanding. 
