@@ -1,0 +1,89 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "needlechain"
+version = "1.0.0"
+description = "NeedleChain: Measuring Intact Long-Context Reasoning Capability of Large Language Models"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "Hyeonseok Moon"},
+    {name = "Heuiseok Lim"},
+]
+keywords = ["llm", "benchmark", "long-context", "evaluation", "reasoning"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10", 
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    # Core ML/LLM libraries
+    "torch>=2.6.0",
+    "transformers>=4.53.1", 
+    "vllm>=0.10.1",
+    "flashinfer-python>=0.2.11",
+    
+    # OpenAI API compatibility
+    "openai>=1.97.0",
+    
+    # Data processing
+    "numpy",
+    "pandas", 
+    "datasets",
+    
+    # Utilities
+    "tqdm",
+    "setproctitle",
+    "requests",
+    "psutil",
+    
+    # Compatibility
+    "xformers",
+    "ninja",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "black>=22.0",
+    "flake8>=4.0",
+    "mypy>=0.900",
+]
+
+cuda = [
+    "torch[cuda]>=2.6.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/manncodes/NeedleChain"
+Documentation = "https://github.com/manncodes/NeedleChain/blob/main/README.md"
+Repository = "https://github.com/manncodes/NeedleChain.git"
+"Bug Reports" = "https://github.com/manncodes/NeedleChain/issues"
+"Paper" = "https://arxiv.org/abs/2507.22411"
+"Dataset" = "https://huggingface.co/datasets/hyeonsss/needlechain"
+
+[project.scripts]
+needlechain-serve = "local_model_serve:main"
+needlechain-eval = "run_local:main"
+
+[tool.black]
+line-length = 88
+target-version = ['py39']
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203", "W503"]
+
+[tool.mypy]
+python_version = "3.9"
+ignore_missing_imports = true

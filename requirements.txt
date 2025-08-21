@@ -1,0 +1,31 @@
+# NeedleChain Dependencies
+# Based on tested configuration and README requirements
+
+# Core ML/LLM libraries
+torch>=2.6.0
+transformers>=4.53.1
+vllm>=0.10.1
+flashinfer-python>=0.2.11
+
+# OpenAI API compatibility  
+openai>=1.97.0
+
+# Data processing
+numpy
+pandas
+datasets
+
+# Utilities
+tqdm
+setproctitle
+requests
+psutil
+
+# Optional: For better compatibility (included in vLLM deps)
+xformers
+ninja
+
+# Development/Testing
+pytest
+black
+flake8

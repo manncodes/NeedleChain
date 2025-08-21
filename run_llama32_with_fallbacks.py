@@ -9,7 +9,7 @@ import sys
 import time
 from pathlib import Path
 
-def run_with_backend(model_path, backend=None, disable_flashinfer=False):
+def run_with_backend(model_path, backend=None, disable_flashinfer=False, timeout=300):
     """Try to run the model with a specific backend configuration."""
     
     cmd = [
@@ -35,22 +35,27 @@ def run_with_backend(model_path, backend=None, disable_flashinfer=False):
     print(f"Command: {' '.join(cmd)}")
     
     try:
-        result = subprocess.run(cmd, timeout=300)  # 5 minute timeout
+        result = subprocess.run(cmd, timeout=timeout)
         return result.returncode == 0
     except subprocess.TimeoutExpired:
-        print("❌ Timed out after 5 minutes")
+        timeout_min = timeout // 60
+        print(f"❌ Timed out after {timeout_min} minutes")
         return False
     except Exception as e:
         print(f"❌ Error: {e}")
         return False
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python run_llama32_with_fallbacks.py <model_path>")
-        print("Example: python run_llama32_with_fallbacks.py /path/to/Llama-3.2-1B")
-        sys.exit(1)
+    import argparse
     
-    model_path = sys.argv[1]
+    parser = argparse.ArgumentParser(
+        description="Automatic fallback script for Llama 3.2 1B with FlashInfer compatibility issues"
+    )
+    parser.add_argument('model_path', help='Path to the model directory')
+    parser.add_argument('--timeout', type=int, default=300, help='Timeout per attempt in seconds')
+    
+    args = parser.parse_args()
+    model_path = args.model_path
     
     if not Path(model_path).exists():
         print(f"❌ Model path does not exist: {model_path}")
@@ -85,7 +90,8 @@ def main():
         success = run_with_backend(
             model_path, 
             backend=config['backend'],
-            disable_flashinfer=config['disable_flashinfer']
+            disable_flashinfer=config['disable_flashinfer'],
+            timeout=args.timeout
         )
         
         if success:
