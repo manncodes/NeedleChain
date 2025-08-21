@@ -184,8 +184,8 @@ def build_vllm_command(model_path, port=8123, rope_scaling=None, max_model_len=N
     # Add rope_scaling if specified
     if rope_scaling:
         if isinstance(rope_scaling, dict):
-            rope_scaling_str = json.dumps(rope_scaling).replace('"', '\\"')
-            cmd_parts.append(f'--rope-scaling \\"{rope_scaling_str}\\"')
+            rope_scaling_str = json.dumps(rope_scaling)
+            cmd_parts.append(f"--rope-scaling '{rope_scaling_str}'")
         else:
             cmd_parts.append(f"--rope-scaling {rope_scaling}")
     
