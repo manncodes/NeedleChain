@@ -11,34 +11,75 @@ import argparse
 import subprocess
 import signal
 import sys
+import threading
 from pathlib import Path
 from multiprocessing import Process
 
-import requests
-from openai import OpenAI
+try:
+    import requests
+except ImportError:
+    print("Warning: requests not available, server health checking disabled")
+    requests = None
 
-def check_server_health(port=8123, max_retries=30, retry_delay=10):
+try:
+    from openai import OpenAI
+except ImportError:
+    print("Warning: openai not available")
+    OpenAI = None
+
+# Import color utilities from local_model_serve
+try:
+    from local_model_serve import Colors, colorize_vllm_log, stream_process_output
+except ImportError:
+    # Fallback if local_model_serve not available
+    class Colors:
+        RESET = '\033[0m'
+        BRIGHT_GREEN = '\033[92m'
+        BRIGHT_RED = '\033[91m'
+        BRIGHT_YELLOW = '\033[93m'
+        BRIGHT_BLUE = '\033[94m'
+        BG_BLUE = '\033[44m'
+        BG_GREEN = '\033[42m'
+        BG_RED = '\033[41m'
+        WHITE = '\033[97m'
+    
+    def colorize_vllm_log(line):
+        return line
+    
+    def stream_process_output(process, prefix="[vLLM]"):
+        return None, None
+
+def check_server_health(port=8123, max_retries=30, retry_delay=2):
     """Check if the model server is healthy and ready."""
+    if not requests:
+        print(f"{Colors.BRIGHT_YELLOW}Warning: requests not available, skipping health check{Colors.RESET}")
+        time.sleep(10)  # Give some time for server to start
+        return True
+    
     url = f"http://localhost:{port}/health"
+    
+    print(f"\n{Colors.BRIGHT_BLUE}Checking server health...{Colors.RESET}")
     
     for i in range(max_retries):
         try:
             response = requests.get(url, timeout=5)
             if response.status_code == 200:
-                print(f"✓ Server is healthy and ready on port {port}")
+                print(f"{Colors.BRIGHT_GREEN}✓ Server is healthy and ready on port {port}{Colors.RESET}")
                 return True
         except (requests.exceptions.RequestException, requests.exceptions.Timeout):
             pass
         
-        print(f"Waiting for server to start... ({i+1}/{max_retries})")
+        # Show progress with dots
+        dots = "." * (i % 4)
+        print(f"{Colors.BRIGHT_BLUE}Waiting for server to be ready{dots:<3} ({i+1}/{max_retries}){Colors.RESET}", end='\r')
         time.sleep(retry_delay)
     
-    print(f"✗ Server failed to start after {max_retries * retry_delay} seconds")
+    print(f"\n{Colors.BRIGHT_RED}✗ Server failed to start after {max_retries * retry_delay} seconds{Colors.RESET}")
     return False
 
 def start_model_server(model_path, port=8123, rope_scaling=None, max_model_len=None, 
                       tensor_parallel_size=1, gpu_devices="0", chat_template=None):
-    """Start the model server in a subprocess."""
+    """Start the model server in a subprocess with colored output streaming."""
     
     cmd = [
         sys.executable, 'local_model_serve.py',
@@ -57,8 +98,21 @@ def start_model_server(model_path, port=8123, rope_scaling=None, max_model_len=N
     if chat_template:
         cmd.extend(['--chat_template', chat_template])
     
-    print(f"Starting model server: {' '.join(cmd)}")
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    print(f"{Colors.BRIGHT_BLUE}Starting model server with command:{Colors.RESET}")
+    print(f"{Colors.WHITE}{' '.join(cmd)}{Colors.RESET}\n")
+    
+    process = subprocess.Popen(
+        cmd, 
+        stdout=subprocess.PIPE, 
+        stderr=subprocess.PIPE,
+        bufsize=1,
+        universal_newlines=False
+    )
+    
+    # Start streaming output in background threads
+    if stream_process_output != None:  # Check if function is available
+        stream_process_output(process, prefix="[Server]")
+    
     return process
 
 def run_inference(model_name, chain_type='forward', question_type='single', 
@@ -79,18 +133,40 @@ def run_inference(model_name, chain_type='forward', question_type='single',
         '--results_dir', results_dir
     ]
     
-    print(f"Running inference: {' '.join(cmd)}")
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    print(f"{Colors.BRIGHT_BLUE}Running inference:{Colors.RESET}")
+    print(f"{Colors.WHITE}{' '.join(cmd)}{Colors.RESET}\n")
     
-    if result.returncode == 0:
-        print("✓ Inference completed successfully")
-        print(f"Results saved to: {results_dir}/{output_name}.jsonl")
+    # Run inference with real-time output streaming
+    process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        bufsize=1,
+        universal_newlines=False
+    )
+    
+    # Stream the output with colors
+    if stream_process_output != None:
+        stdout_thread, stderr_thread = stream_process_output(process, prefix="[Inference]")
+        
+        # Wait for process to complete
+        return_code = process.wait()
+        
+        # Wait for threads to finish
+        if stdout_thread:
+            stdout_thread.join(timeout=1)
+        if stderr_thread:
+            stderr_thread.join(timeout=1)
     else:
-        print("✗ Inference failed")
-        print("STDOUT:", result.stdout)
-        print("STDERR:", result.stderr)
+        return_code = process.wait()
     
-    return result.returncode == 0
+    if return_code == 0:
+        print(f"{Colors.BRIGHT_GREEN}✓ Inference completed successfully{Colors.RESET}")
+        print(f"{Colors.BRIGHT_GREEN}Results saved to: {results_dir}/{output_name}.jsonl{Colors.RESET}")
+    else:
+        print(f"{Colors.BRIGHT_RED}✗ Inference failed (exit code: {return_code}){Colors.RESET}")
+    
+    return return_code == 0
 
 def load_model_config(model_path):
     """Load model configuration."""
@@ -187,8 +263,8 @@ def main():
     if not args.model_name:
         args.model_name = Path(args.model_path).name.replace('/', '_')
     
-    print(f"Setting up local model: {args.model_name}")
-    print(f"Model path: {args.model_path}")
+    print(f"{Colors.BRIGHT_BLUE}Setting up local model: {Colors.BRIGHT_WHITE}{args.model_name}{Colors.RESET}")
+    print(f"{Colors.BRIGHT_BLUE}Model path: {Colors.WHITE}{args.model_path}{Colors.RESET}")
     
     # Load model config for auto-configuration
     rope_scaling = None
@@ -196,11 +272,11 @@ def main():
         config = load_model_config(args.model_path)
         if 'rope_scaling' in config and not args.rope_scaling:
             rope_scaling = config['rope_scaling']
-            print(f"Auto-detected rope_scaling from model config: {rope_scaling}")
+            print(f"{Colors.BRIGHT_GREEN}Auto-detected rope_scaling from model config: {rope_scaling}{Colors.RESET}")
         
         if 'max_position_embeddings' in config and not args.max_model_len:
             args.max_model_len = config['max_position_embeddings']
-            print(f"Auto-detected max_model_len: {args.max_model_len}")
+            print(f"{Colors.BRIGHT_GREEN}Auto-detected max_model_len: {args.max_model_len}{Colors.RESET}")
     
     # Parse rope_scaling if provided
     if args.rope_scaling:
@@ -216,9 +292,8 @@ def main():
     server_process = None
     try:
         # Start model server
-        print("\n" + "="*60)
-        print("STARTING MODEL SERVER")
-        print("="*60)
+        print(f"\n{Colors.BG_BLUE}{Colors.WHITE} STARTING MODEL SERVER {Colors.RESET}")
+        print(f"{Colors.BRIGHT_BLUE}{'='*60}{Colors.RESET}")
         
         server_process = start_model_server(
             model_path=args.model_path,
@@ -236,17 +311,16 @@ def main():
             return
         
         if args.serve_only:
-            print("Server started. Use Ctrl+C to stop.")
+            print(f"{Colors.BRIGHT_GREEN}Server started. Use Ctrl+C to stop.{Colors.RESET}")
             try:
                 server_process.wait()
             except KeyboardInterrupt:
-                print("\nStopping server...")
+                print(f"\n{Colors.BRIGHT_YELLOW}Stopping server...{Colors.RESET}")
             return
         
         # Run inference
-        print("\n" + "="*60)
-        print("RUNNING INFERENCE")
-        print("="*60)
+        print(f"\n{Colors.BG_GREEN}{Colors.WHITE} RUNNING INFERENCE {Colors.RESET}")
+        print(f"{Colors.BRIGHT_GREEN}{'='*60}{Colors.RESET}")
         
         success = run_inference(
             model_name=args.model_name,
@@ -259,23 +333,23 @@ def main():
         )
         
         if success:
-            print("\n✓ Complete! Results are ready.")
+            print(f"\n{Colors.BG_GREEN}{Colors.WHITE} COMPLETE! RESULTS ARE READY {Colors.RESET}")
         else:
-            print("\n✗ Inference failed. Check logs above.")
+            print(f"\n{Colors.BG_RED}{Colors.WHITE} INFERENCE FAILED - CHECK LOGS ABOVE {Colors.RESET}")
         
     except KeyboardInterrupt:
-        print("\nInterrupted by user")
+        print(f"\n{Colors.BRIGHT_YELLOW}Interrupted by user{Colors.RESET}")
     
     finally:
         if server_process:
-            print("Stopping model server...")
+            print(f"{Colors.BRIGHT_YELLOW}Stopping model server...{Colors.RESET}")
             server_process.terminate()
             try:
                 server_process.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 server_process.kill()
                 server_process.wait()
-            print("Server stopped.")
+            print(f"{Colors.BRIGHT_GREEN}Server stopped.{Colors.RESET}")
 
 if __name__ == '__main__':
     main()

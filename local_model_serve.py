@@ -1,6 +1,9 @@
 import os
 import json
 import argparse
+import sys
+import subprocess
+import threading
 from pathlib import Path
 
 try:
@@ -9,6 +12,146 @@ try:
 except ImportError:
     # setproctitle is optional
     pass
+
+# ANSI color codes for terminal output
+class Colors:
+    RESET = '\033[0m'
+    BOLD = '\033[1m'
+    DIM = '\033[2m'
+    
+    # Standard colors
+    RED = '\033[31m'
+    GREEN = '\033[32m'
+    YELLOW = '\033[33m'
+    BLUE = '\033[34m'
+    MAGENTA = '\033[35m'
+    CYAN = '\033[36m'
+    WHITE = '\033[37m'
+    
+    # Bright colors
+    BRIGHT_RED = '\033[91m'
+    BRIGHT_GREEN = '\033[92m'
+    BRIGHT_YELLOW = '\033[93m'
+    BRIGHT_BLUE = '\033[94m'
+    BRIGHT_MAGENTA = '\033[95m'
+    BRIGHT_CYAN = '\033[96m'
+    BRIGHT_WHITE = '\033[97m'
+    
+    # Background colors
+    BG_BLUE = '\033[44m'
+    BG_GREEN = '\033[42m'
+    BG_RED = '\033[41m'
+
+def colorize_vllm_log(line):
+    """Apply colors to vLLM log lines based on content."""
+    line = line.strip()
+    if not line:
+        return line
+    
+    # Error messages
+    if any(keyword in line.lower() for keyword in ['error', 'failed', 'exception', 'traceback']):
+        return f"{Colors.BRIGHT_RED}{line}{Colors.RESET}"
+    
+    # Warning messages
+    if any(keyword in line.lower() for keyword in ['warning', 'warn']):
+        return f"{Colors.BRIGHT_YELLOW}{line}{Colors.RESET}"
+    
+    # Success/completion messages
+    if any(keyword in line.lower() for keyword in ['successfully', 'completed', 'ready', 'started', 'loaded']):
+        return f"{Colors.BRIGHT_GREEN}{line}{Colors.RESET}"
+    
+    # Model loading info
+    if any(keyword in line.lower() for keyword in ['loading', 'initializing', 'model']):
+        return f"{Colors.BRIGHT_CYAN}{line}{Colors.RESET}"
+    
+    # GPU/CUDA info
+    if any(keyword in line.lower() for keyword in ['gpu', 'cuda', 'tensor']):
+        return f"{Colors.BRIGHT_MAGENTA}{line}{Colors.RESET}"
+    
+    # Info level messages
+    if 'info' in line.lower() or line.startswith('INFO'):
+        return f"{Colors.BLUE}{line}{Colors.RESET}"
+    
+    # Debug messages
+    if 'debug' in line.lower() or line.startswith('DEBUG'):
+        return f"{Colors.DIM}{line}{Colors.RESET}"
+    
+    # Default - slightly dimmed
+    return f"{Colors.WHITE}{line}{Colors.RESET}"
+
+def stream_process_output(process, prefix="[vLLM]"):
+    """Stream and colorize process output in real-time."""
+    def stream_stdout():
+        for line in iter(process.stdout.readline, b''):
+            line = line.decode('utf-8', errors='ignore').rstrip()
+            if line:
+                colored_line = colorize_vllm_log(line)
+                print(f"{Colors.BRIGHT_BLUE}{prefix}{Colors.RESET} {colored_line}")
+                sys.stdout.flush()
+    
+    def stream_stderr():
+        for line in iter(process.stderr.readline, b''):
+            line = line.decode('utf-8', errors='ignore').rstrip()
+            if line:
+                colored_line = colorize_vllm_log(line)
+                print(f"{Colors.BRIGHT_RED}{prefix}[ERR]{Colors.RESET} {colored_line}")
+                sys.stdout.flush()
+    
+    stdout_thread = threading.Thread(target=stream_stdout)
+    stderr_thread = threading.Thread(target=stream_stderr)
+    
+    stdout_thread.daemon = True
+    stderr_thread.daemon = True
+    
+    stdout_thread.start()
+    stderr_thread.start()
+    
+    return stdout_thread, stderr_thread
+
+def execute_vllm_command(cmd):
+    """Execute vLLM command with real-time colored output streaming."""
+    print(f"\n{Colors.BG_BLUE}{Colors.WHITE} Starting vLLM Server {Colors.RESET}")
+    print(f"{Colors.BRIGHT_BLUE}Command:{Colors.RESET} {cmd}")
+    print(f"{Colors.BRIGHT_BLUE}{'='*60}{Colors.RESET}")
+    
+    # Parse the command for subprocess
+    process = subprocess.Popen(
+        cmd,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        bufsize=1,
+        universal_newlines=False
+    )
+    
+    # Start streaming threads
+    stdout_thread, stderr_thread = stream_process_output(process)
+    
+    try:
+        # Wait for process to complete
+        return_code = process.wait()
+        
+        # Wait a bit for threads to finish processing remaining output
+        stdout_thread.join(timeout=1)
+        stderr_thread.join(timeout=1)
+        
+        if return_code == 0:
+            print(f"\n{Colors.BG_GREEN}{Colors.WHITE} vLLM Server Started Successfully {Colors.RESET}\n")
+        else:
+            print(f"\n{Colors.BG_RED}{Colors.WHITE} vLLM Server Failed (exit code: {return_code}) {Colors.RESET}\n")
+        
+        return return_code == 0
+        
+    except KeyboardInterrupt:
+        print(f"\n{Colors.BRIGHT_YELLOW}Stopping vLLM server...{Colors.RESET}")
+        process.terminate()
+        try:
+            process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+        print(f"{Colors.BRIGHT_YELLOW}Server stopped.{Colors.RESET}")
+        return False
 
 def load_model_config(model_path):
     """Load model configuration to check for rope_scaling settings."""
@@ -132,18 +275,19 @@ def main():
         if chat_template and os.path.exists(chat_template):
             cmd += f" \\\n        --chat-template {chat_template}"
         
-        print("="*60)
-        print("Starting local model server with command:")
-        print("="*60)
-        print(cmd)
-        print("="*60)
-        
         if args.dry_run:
+            print("="*60)
+            print("Starting local model server with command:")
+            print("="*60)
+            print(cmd)
+            print("="*60)
             print("Dry run mode - command not executed")
             return
         
-        # Execute the command
-        os.system(cmd)
+        # Execute the command with colored output streaming
+        success = execute_vllm_command(cmd)
+        if not success:
+            sys.exit(1)
     
     else:
         print(f"Framework {args.framework} not yet supported")
