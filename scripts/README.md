@@ -1,8 +1,51 @@
 # NeedleChain Scripts
 
-Convenient shell scripts for running NeedleChain with different configurations, especially for FlashInfer compatibility issues.
+Convenient shell scripts for running NeedleChain evaluations with different configurations, following the proper 2-stage approach: host model + run evaluation.
 
-## 🚀 Quick Start Scripts
+## 🎯 Two-Stage Evaluation (Recommended)
+
+### Stage 1: Host Model
+```bash
+# Start model server (keeps running)
+bash scripts/stage1_host_model.sh [model_path] [attention_backend]
+
+# Examples:
+bash scripts/stage1_host_model.sh /exp/model/Huggingface/meta-llama/Llama-3.2-1B XFORMERS
+bash scripts/stage1_host_model.sh /path/to/model FLASH_ATTN
+```
+
+### Stage 2: Run Evaluation  
+```bash
+# Run evaluation against hosted model (in another terminal)
+bash scripts/stage2_run_evaluation.sh [model_name] [k] [chain_type] [question_type]
+
+# Examples:
+bash scripts/stage2_run_evaluation.sh Llama-3.2-1B 5 forward single
+bash scripts/stage2_run_evaluation.sh Llama-3.2-1B 10 backward total
+```
+
+## 🚀 One-Command Solutions
+
+### Full Pipeline
+```bash
+# Combines both stages automatically
+bash scripts/full_evaluation.sh [model_path] [k] [chain_type] [question_type] [backend]
+
+# Examples:
+bash scripts/full_evaluation.sh /exp/model/Huggingface/meta-llama/Llama-3.2-1B 5 forward single XFORMERS
+bash scripts/full_evaluation.sh /path/to/model 10 chaotic total FLASH_ATTN
+```
+
+### Batch Evaluation
+```bash
+# Run multiple k/chain/question combinations
+bash scripts/batch_evaluation.sh [model_path] [attention_backend]
+
+# Example:
+bash scripts/batch_evaluation.sh /exp/model/Huggingface/meta-llama/Llama-3.2-1B XFORMERS
+```
+
+## 🚀 Legacy Quick Start Scripts
 
 ### Basic Evaluation
 ```bash
@@ -54,6 +97,15 @@ bash scripts/test_different_ks.sh /path/to/model XFORMERS
 
 ## 📁 File Descriptions
 
+### Two-Stage Scripts (Recommended)
+| Script | Purpose | Usage |
+|--------|---------|--------|
+| `stage1_host_model.sh` | Start model server | `bash scripts/stage1_host_model.sh [model_path] [backend]` |
+| `stage2_run_evaluation.sh` | Run evaluation | `bash scripts/stage2_run_evaluation.sh [model] [k] [chain] [question]` |
+| `full_evaluation.sh` | Complete pipeline | `bash scripts/full_evaluation.sh [model_path] [k] [chain] [question]` |
+| `batch_evaluation.sh` | Multiple configurations | `bash scripts/batch_evaluation.sh [model_path] [backend]` |
+
+### Legacy Scripts (FlashInfer compatibility)
 | Script | Purpose | Backend | FlashInfer |
 |--------|---------|---------|------------|
 | `llama3_2_1b_eval.sh` | Basic evaluation | Default | Enabled |
