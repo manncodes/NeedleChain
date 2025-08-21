@@ -1,192 +1,96 @@
-# Local Model Scripts
+# NeedleChain Scripts
 
-This directory contains scripts for running NeedleChain with local models.
+Convenient shell scripts for running NeedleChain with different configurations, especially for FlashInfer compatibility issues.
 
-## Scripts Overview
+## 🚀 Quick Start Scripts
 
-### Core Scripts
-
-- **`local_model_serve.py`** - Direct model server with full control
-- **`run_local.py`** - Complete pipeline (serve + inference)
-- **`test_llama32_1b.py`** - Automated test for Llama3.2 1B
-- **`run_llama32_with_fallbacks.py`** - Automatic fallback testing
-
-## Quick Start
-
-### Basic Usage
-
+### Basic Evaluation
 ```bash
-# From repository root
-python scripts/run_local.py --model_path /path/to/your/model
+# Default settings (may fail with FlashInfer issues)
+bash scripts/llama3_2_1b_eval.sh
+
+# With custom model path
+bash scripts/llama3_2_1b_eval.sh /path/to/your/Llama-3.2-1B
 ```
 
-### FlashInfer Compatibility Issues
+### FlashInfer Compatibility Scripts
 
-If you encounter FlashInfer compilation errors:
-
+**Most Recommended - Auto Fallback**:
 ```bash
-# Try automatic fallbacks
-python scripts/run_llama32_with_fallbacks.py /path/to/your/model
-
-# Or use specific backend
-python scripts/run_local.py \
-    --model_path /path/to/model \
-    --attention_backend FLASH_ATTN \
-    --disable_flashinfer_sampling
+bash scripts/llama3_2_1b_auto_fallback.sh
 ```
+Automatically tries different configurations until one works.
 
-### Test Llama 3.2 1B
-
+**Flash Attention Backend**:
 ```bash
-python scripts/test_llama32_1b.py
+bash scripts/llama3_2_1b_flash_attn.sh
 ```
 
-## Script Details
-
-### `local_model_serve.py`
-
-Direct model serving with maximum control:
-
+**xFormers Backend (Most Compatible)**:
 ```bash
-python scripts/local_model_serve.py \
-    --model_path /path/to/model \
-    --port 8123 \
-    --rope_scaling '{"type":"linear","factor":2.0}' \
-    --attention_backend FLASH_ATTN \
-    --disable_flashinfer_sampling
+bash scripts/llama3_2_1b_xformers.sh
 ```
 
-**Key Features:**
-- Auto-detects rope_scaling from model config.json
-- Supports custom rope_scaling overrides  
-- Real-time colored log streaming
-- Multiple attention backend support
-- FlashInfer compatibility options
-
-### `run_local.py`
-
-Complete pipeline from serving to inference:
-
-```bash  
-python scripts/run_local.py \
-    --model_path /path/to/model \
-    --model_name my-model \
-    --k 10 \
-    --chain_type forward \
-    --attention_backend XFORMERS
-```
-
-**Key Features:**
-- Auto-configuration from model files
-- Automatic model registration in utils.py
-- Server health checking with colored progress
-- Real-time inference streaming
-- Comprehensive error handling
-
-### `run_llama32_with_fallbacks.py`
-
-Automatic compatibility testing:
-
+**PyTorch SDPA Backend**:
 ```bash
-python scripts/run_llama32_with_fallbacks.py /path/to/Llama-3.2-1B
+bash scripts/llama3_2_1b_torch_sdpa.sh
 ```
 
-**Tries multiple configurations:**
-1. Default (FlashInfer enabled)
-2. FlashInfer disabled
-3. Flash Attention backend
-4. xFormers backend  
-5. PyTorch SDPA backend
+### Server Only Scripts
 
-Reports which configuration works and provides the exact command for future use.
-
-### `test_llama32_1b.py`
-
-Automated Llama 3.2 1B setup and testing:
-
+**Start server without inference**:
 ```bash
-python scripts/test_llama32_1b.py
+bash scripts/serve_only_flash_attn.sh
 ```
+Server runs on http://localhost:8123, press Ctrl+C to stop.
 
-**Features:**
-- Automatic model detection/download guidance
-- Requirements checking
-- Interactive setup
-- Conservative test parameters
+### Testing Scripts
 
-## Common Options
-
-### Attention Backends
-
-- `FLASH_ATTN` - Flash Attention (usually fastest)
-- `XFORMERS` - xFormers (most compatible)  
-- `TORCH_SDPA` - PyTorch native (fallback)
-
-### FlashInfer Options
-
-- `--disable_flashinfer_sampling` - Disable FlashInfer sampling
-- Environment variable: `VLLM_ATTENTION_BACKEND`
-
-### Rope Scaling
-
+**Test different needle counts (k values)**:
 ```bash
-# JSON string
---rope_scaling '{"type":"linear","factor":2.0}'
-
-# From file  
---rope_scaling /path/to/config.json
-
-# Auto-detect from model config.json (default)
+bash scripts/test_different_ks.sh
+bash scripts/test_different_ks.sh /path/to/model XFORMERS
 ```
 
-## Troubleshooting
+## 📁 File Descriptions
 
-### FlashInfer Compilation Error
+| Script | Purpose | Backend | FlashInfer |
+|--------|---------|---------|------------|
+| `llama3_2_1b_eval.sh` | Basic evaluation | Default | Enabled |
+| `llama3_2_1b_flash_attn.sh` | Flash Attention | FLASH_ATTN | Disabled |
+| `llama3_2_1b_xformers.sh` | xFormers (safest) | XFORMERS | Disabled |
+| `llama3_2_1b_torch_sdpa.sh` | PyTorch SDPA | TORCH_SDPA | Disabled |
+| `llama3_2_1b_auto_fallback.sh` | Auto-retry all | Multiple | Smart |
+| `serve_only_flash_attn.sh` | Server only | FLASH_ATTN | Disabled |
+| `test_different_ks.sh` | Multi-k testing | Configurable | Disabled |
 
-```
-nvcc fatal: Unknown option '-static-global-template-stub=false'
-```
+## 🛠️ Troubleshooting
 
-**Solution:** Use attention backend fallbacks:
-```bash
-python scripts/run_local.py --attention_backend XFORMERS --disable_flashinfer_sampling
-```
+**FlashInfer compilation errors**:
+- Try `llama3_2_1b_auto_fallback.sh` first
+- If that fails, try `llama3_2_1b_xformers.sh`
 
-### Out of Memory
+**Out of memory errors**:
+- Use smaller k values
+- Reduce max_model_len in the scripts
 
-- Reduce `--max_model_len`
-- Use smaller models
-- Try `--tensor_parallel_size 1`
-
-### Server Won't Start
-
+**CUDA errors**:
 - Check GPU availability: `nvidia-smi`
-- Verify model path exists
-- Check port availability: `netstat -an | grep 8123`
+- Try different attention backends
 
-## Examples
+## 📝 Customization
 
-### Llama 3.2 1B
+All scripts accept model path as first argument:
 ```bash
-python scripts/run_local.py \
-    --model_path /path/to/Llama-3.2-1B \
-    --attention_backend FLASH_ATTN \
-    --max_model_len 8192
+bash scripts/llama3_2_1b_flash_attn.sh /your/custom/model/path
 ```
 
-### Qwen2.5 7B  
+To modify other parameters, edit the scripts directly or use the Python scripts:
 ```bash
-python scripts/run_local.py \
-    --model_path /path/to/Qwen2.5-7B \
-    --rope_scaling '{"type":"linear","factor":1.5}' \
-    --k 20
+python3 run_local.py --help
+python3 local_model_serve.py --help
 ```
 
-### Multi-GPU Large Model
-```bash
-python scripts/run_local.py \
-    --model_path /path/to/Llama-3.1-70B \
-    --tensor_parallel_size 4 \
-    --gpu_devices "0,1,2,3" \
-    --max_model_len 32768
-```
+## 🎯 Results
+
+All results are saved to `./results/` directory with descriptive filenames.

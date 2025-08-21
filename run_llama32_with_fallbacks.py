@@ -13,7 +13,7 @@ def run_with_backend(model_path, backend=None, disable_flashinfer=False):
     """Try to run the model with a specific backend configuration."""
     
     cmd = [
-        sys.executable, 'scripts/run_local.py',
+        sys.executable, 'run_local.py',
         '--model_path', model_path,
         '--model_name', 'llama32-1b-fallback',
         '--k', '5',
@@ -94,7 +94,7 @@ def main():
             print(f"   - FlashInfer Sampling: {'Disabled' if config['disable_flashinfer'] else 'Enabled'}")
             print(f"\n💡 To use this configuration again, run:")
             
-            cmd_suggestion = f"python scripts/run_local.py --model_path {model_path}"
+            cmd_suggestion = f"python run_local.py --model_path {model_path}"
             if config['backend']:
                 cmd_suggestion += f" --attention_backend {config['backend']}"
             if config['disable_flashinfer']:

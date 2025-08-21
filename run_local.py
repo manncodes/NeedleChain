@@ -29,28 +29,25 @@ except ImportError:
 
 # Import color utilities from local_model_serve
 try:
-    from .local_model_serve import Colors, colorize_vllm_log, stream_process_output
+    from local_model_serve import Colors, colorize_vllm_log, stream_process_output
 except ImportError:
-    try:
-        from local_model_serve import Colors, colorize_vllm_log, stream_process_output
-    except ImportError:
-        # Fallback if local_model_serve not available
-        class Colors:
-            RESET = '\033[0m'
-            BRIGHT_GREEN = '\033[92m'
-            BRIGHT_RED = '\033[91m'
-            BRIGHT_YELLOW = '\033[93m'
-            BRIGHT_BLUE = '\033[94m'
-            BG_BLUE = '\033[44m'
-            BG_GREEN = '\033[42m'
-            BG_RED = '\033[41m'
-            WHITE = '\033[97m'
+    # Fallback if local_model_serve not available
+    class Colors:
+        RESET = '\033[0m'
+        BRIGHT_GREEN = '\033[92m'
+        BRIGHT_RED = '\033[91m'
+        BRIGHT_YELLOW = '\033[93m'
+        BRIGHT_BLUE = '\033[94m'
+        BG_BLUE = '\033[44m'
+        BG_GREEN = '\033[42m'
+        BG_RED = '\033[41m'
+        WHITE = '\033[97m'
     
-        def colorize_vllm_log(line):
-            return line
-        
-        def stream_process_output(process, prefix="[vLLM]"):
-            return None, None
+    def colorize_vllm_log(line):
+        return line
+    
+    def stream_process_output(process, prefix="[vLLM]"):
+        return None, None
 
 def check_server_health(port=8123, max_retries=30, retry_delay=2):
     """Check if the model server is healthy and ready."""
@@ -86,7 +83,7 @@ def start_model_server(model_path, port=8123, rope_scaling=None, max_model_len=N
     """Start the model server in a subprocess with colored output streaming."""
     
     cmd = [
-        sys.executable, 'scripts/local_model_serve.py',
+        sys.executable, 'local_model_serve.py',
         '--model_path', model_path,
         '--port', str(port),
         '--tensor_parallel_size', str(tensor_parallel_size),
