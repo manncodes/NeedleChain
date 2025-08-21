@@ -1,0 +1,8 @@
+{
+  "architectures": ["LlamaForCausalLM"],
+  "max_position_embeddings": 8192,
+  "rope_scaling": {
+    "type": "linear", 
+    "factor": 1.5
+  }
+}
