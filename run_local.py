@@ -78,7 +78,8 @@ def check_server_health(port=8123, max_retries=30, retry_delay=2):
     return False
 
 def start_model_server(model_path, port=8123, rope_scaling=None, max_model_len=None, 
-                      tensor_parallel_size=1, gpu_devices="0", chat_template=None):
+                      tensor_parallel_size=1, gpu_devices="0", chat_template=None,
+                      attention_backend=None, disable_flashinfer_sampling=False):
     """Start the model server in a subprocess with colored output streaming."""
     
     cmd = [
@@ -97,6 +98,12 @@ def start_model_server(model_path, port=8123, rope_scaling=None, max_model_len=N
     
     if chat_template:
         cmd.extend(['--chat_template', chat_template])
+    
+    if attention_backend:
+        cmd.extend(['--attention_backend', attention_backend])
+    
+    if disable_flashinfer_sampling:
+        cmd.extend(['--disable_flashinfer_sampling'])
     
     print(f"{Colors.BRIGHT_BLUE}Starting model server with command:{Colors.RESET}")
     print(f"{Colors.WHITE}{' '.join(cmd)}{Colors.RESET}\n")
@@ -256,6 +263,10 @@ def main():
                        help='Only start server, do not run inference')
     parser.add_argument('--no_auto_config', action='store_true', 
                        help='Do not auto-detect model configuration')
+    parser.add_argument('--attention_backend', choices=['FLASH_ATTN', 'XFORMERS', 'TORCH_SDPA'], 
+                       help='vLLM attention backend (helps with FlashInfer issues)')
+    parser.add_argument('--disable_flashinfer_sampling', action='store_true',
+                       help='Disable FlashInfer sampling (use for CUDA compatibility issues)')
     
     args = parser.parse_args()
     
@@ -302,7 +313,9 @@ def main():
             max_model_len=args.max_model_len,
             tensor_parallel_size=args.tensor_parallel_size,
             gpu_devices=args.gpu_devices,
-            chat_template=args.chat_template
+            chat_template=args.chat_template,
+            attention_backend=args.attention_backend,
+            disable_flashinfer_sampling=args.disable_flashinfer_sampling
         )
         
         # Wait for server to be ready

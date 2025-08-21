@@ -163,15 +163,23 @@ def load_model_config(model_path):
     return None
 
 def build_vllm_command(model_path, port=8123, rope_scaling=None, max_model_len=None, 
-                      tensor_parallel_size=1, api_key="needlechain", gpu_devices="0"):
+                      tensor_parallel_size=1, api_key="needlechain", gpu_devices="0",
+                      attention_backend=None, disable_flashinfer_sampling=False):
     """Build vLLM serving command with proper rope_scaling configuration."""
     
     # Load config from model if rope_scaling not provided
     if rope_scaling is None:
         rope_scaling = load_model_config(model_path)
     
+    # Set environment variables for compatibility
+    env_vars = [f"CUDA_VISIBLE_DEVICES={gpu_devices}"]
+    
+    # Add attention backend environment variable if specified
+    if attention_backend:
+        env_vars.append(f"VLLM_ATTENTION_BACKEND={attention_backend}")
+    
     cmd_parts = [
-        f"CUDA_VISIBLE_DEVICES={gpu_devices}",
+        " ".join(env_vars),
         "vllm serve", 
         f'"{model_path}"',
         f"--port {port}",
@@ -192,6 +200,10 @@ def build_vllm_command(model_path, port=8123, rope_scaling=None, max_model_len=N
     # Add max_model_len if specified
     if max_model_len:
         cmd_parts.append(f"--max_model_len {max_model_len}")
+    
+    # Add compatibility flags for older CUDA/FlashInfer issues
+    if disable_flashinfer_sampling:
+        cmd_parts.append("--disable-flashinfer")
     
     return " \\\n        ".join(cmd_parts)
 
@@ -236,6 +248,10 @@ def main():
     parser.add_argument('--rope_scaling', help='Rope scaling configuration (JSON string or file path)')
     parser.add_argument('--chat_template', help='Path to chat template file')
     parser.add_argument('--framework', default='vllm', choices=['vllm'], help='Serving framework')
+    parser.add_argument('--attention_backend', choices=['FLASH_ATTN', 'XFORMERS', 'TORCH_SDPA'], 
+                       help='vLLM attention backend (helps with FlashInfer issues)')
+    parser.add_argument('--disable_flashinfer_sampling', action='store_true',
+                       help='Disable FlashInfer sampling (use for CUDA compatibility issues)')
     parser.add_argument('--dry_run', action='store_true', help='Print command without executing')
     
     args = parser.parse_args()
@@ -269,7 +285,9 @@ def main():
             max_model_len=args.max_model_len,
             tensor_parallel_size=args.tensor_parallel_size,
             api_key=args.api_key,
-            gpu_devices=args.gpu_devices
+            gpu_devices=args.gpu_devices,
+            attention_backend=args.attention_backend,
+            disable_flashinfer_sampling=args.disable_flashinfer_sampling
         )
         
         if chat_template and os.path.exists(chat_template):
