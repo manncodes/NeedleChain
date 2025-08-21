@@ -203,7 +203,7 @@ def build_vllm_command(model_path, port=8123, rope_scaling=None, max_model_len=N
     
     # Add compatibility flags for older CUDA/FlashInfer issues
     if disable_flashinfer_sampling:
-        cmd_parts.append("--disable-flashinfer")
+        cmd_parts.append("--disable-flashinfer-sampling")
     
     return " \\\n        ".join(cmd_parts)
 
