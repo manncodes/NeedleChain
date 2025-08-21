@@ -16,6 +16,23 @@ Every provided context consists of query-relevant information, requiring a compr
 
 ---
 
+## Local Model Support
+
+NeedleChain now supports running with local models! See [`scripts/`](scripts/) for local model utilities:
+
+- **Quick Start**: `python scripts/run_local.py --model_path /path/to/model`
+- **FlashInfer Issues?**: `python scripts/run_llama32_with_fallbacks.py /path/to/model` 
+- **Documentation**: [`LOCAL_MODELS.md`](LOCAL_MODELS.md) | [`scripts/README.md`](scripts/README.md)
+
+### Features
+✅ Auto-detects rope_scaling from model config  
+✅ Real-time colored vLLM log streaming  
+✅ FlashInfer compatibility workarounds  
+✅ Multi-GPU tensor parallelism  
+✅ Comprehensive fallback testing  
+
+---
+
 ## Data Genration
 
 We placed sample data used in our experiments in the `./data` folder.

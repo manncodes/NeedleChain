@@ -8,10 +8,10 @@ This guide explains how to run NeedleChain with local models, including proper h
 
 ```bash
 # Run with auto-detected settings
-python run_local.py --model_path /path/to/your/model
+python scripts/run_local.py --model_path /path/to/your/model
 
 # Run with specific parameters  
-python run_local.py \
+python scripts/run_local.py \
     --model_path /path/to/llama32-1b \
     --model_name llama32-1b \
     --max_model_len 8192 \
@@ -28,7 +28,7 @@ huggingface-cli download unsloth/Llama-3.2-1B-Instruct --local-dir ./models/Llam
 git clone https://huggingface.co/unsloth/Llama-3.2-1B-Instruct ./models/Llama-3.2-1B-Instruct
 
 # Run test
-python test_llama32_1b.py
+python scripts/test_llama32_1b.py
 ```
 
 ## Advanced Configuration
@@ -39,13 +39,13 @@ The system automatically detects rope_scaling from the model's `config.json`. Yo
 
 ```bash
 # Override rope_scaling
-python run_local.py \
+python scripts/run_local.py \
     --model_path /path/to/model \
     --rope_scaling '{"type": "linear", "factor": 2.0}'
 
 # Load rope_scaling from file
 echo '{"type": "linear", "factor": 2.0}' > rope_config.json
-python run_local.py \
+python scripts/run_local.py \
     --model_path /path/to/model \
     --rope_scaling rope_config.json
 ```
@@ -54,7 +54,7 @@ python run_local.py \
 
 ```bash
 # Use multiple GPUs
-python run_local.py \
+python scripts/run_local.py \
     --model_path /path/to/model \
     --tensor_parallel_size 2 \
     --gpu_devices "0,1"
@@ -64,7 +64,7 @@ python run_local.py \
 
 ```bash
 # Use specific chat template
-python run_local.py \
+python scripts/run_local.py \
     --model_path /path/to/model \
     --chat_template ./chat_templates/llama3.1_chat_template.jinja
 ```
@@ -95,7 +95,7 @@ NeedleChain/
 Direct model serving with full control:
 
 ```bash
-python local_model_serve.py \
+python scripts/local_model_serve.py \
     --model_path /path/to/model \
     --port 8123 \
     --tensor_parallel_size 1 \
@@ -109,7 +109,7 @@ python local_model_serve.py \
 Full pipeline (serve + inference):
 
 ```bash
-python run_local.py \
+python scripts/run_local.py \
     --model_path /path/to/model \
     --model_name my-model \
     --k 10 \
@@ -123,7 +123,7 @@ python run_local.py \
 Automated test for Llama3.2 1B:
 
 ```bash
-python test_llama32_1b.py
+python scripts/test_llama32_1b.py
 # Automatically detects model, downloads if needed, runs test
 ```
 
@@ -186,7 +186,7 @@ Auto-detected chat templates:
 
 ### Llama3.2 1B
 ```bash
-python run_local.py \
+python scripts/run_local.py \
     --model_path ./models/Llama-3.2-1B-Instruct \
     --model_name llama32-1b \
     --max_model_len 8192 \
@@ -195,7 +195,7 @@ python run_local.py \
 
 ### Qwen2.5 7B with Rope Scaling
 ```bash
-python run_local.py \
+python scripts/run_local.py \
     --model_path ./models/Qwen2.5-7B-Instruct \
     --model_name qwen25-7b \
     --rope_scaling '{"type": "linear", "factor": 1.5}' \
@@ -205,7 +205,7 @@ python run_local.py \
 
 ### Multi-GPU Setup
 ```bash
-python run_local.py \
+python scripts/run_local.py \
     --model_path ./models/Llama-3.1-70B-Instruct \
     --model_name llama31-70b \
     --tensor_parallel_size 4 \
