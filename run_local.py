@@ -49,7 +49,7 @@ except ImportError:
     def stream_process_output(process, prefix="[vLLM]"):
         return None, None
 
-def check_server_health(port=8123, max_retries=30, retry_delay=2):
+def check_server_health(port=8123, max_retries=60, retry_delay=3):
     """Check if the model server is healthy and ready."""
     if not requests:
         print(f"{Colors.BRIGHT_YELLOW}Warning: requests not available, skipping health check{Colors.RESET}")
@@ -75,6 +75,7 @@ def check_server_health(port=8123, max_retries=30, retry_delay=2):
         time.sleep(retry_delay)
     
     print(f"\n{Colors.BRIGHT_RED}✗ Server failed to start after {max_retries * retry_delay} seconds{Colors.RESET}")
+    print(f"{Colors.YELLOW}Tip: Try running with --attention_backend XFORMERS or check server logs{Colors.RESET}")
     return False
 
 def start_model_server(model_path, port=8123, rope_scaling=None, max_model_len=None, 
@@ -267,6 +268,8 @@ def main():
                        help='vLLM attention backend (helps with FlashInfer issues)')
     parser.add_argument('--disable_flashinfer_sampling', action='store_true',
                        help='Disable FlashInfer sampling (use for CUDA compatibility issues)')
+    parser.add_argument('--dry_run', action='store_true',
+                       help='Print commands without executing (for testing)')
     
     args = parser.parse_args()
     
@@ -296,6 +299,42 @@ def main():
         except json.JSONDecodeError:
             print(f"Error: Invalid JSON in rope_scaling: {args.rope_scaling}")
             return
+    
+    # Handle dry run mode
+    if args.dry_run:
+        print(f"\n{Colors.BRIGHT_BLUE}Dry run mode - showing commands that would be executed:{Colors.RESET}")
+        
+        # Show server command
+        cmd = [
+            sys.executable, 'local_model_serve.py',
+            '--model_path', args.model_path,
+            '--port', str(args.port),
+            '--tensor_parallel_size', str(args.tensor_parallel_size),
+        ]
+        if rope_scaling:
+            cmd.extend(['--rope_scaling', json.dumps(rope_scaling)])
+        if args.max_model_len:
+            cmd.extend(['--max_model_len', str(args.max_model_len)])
+        if args.chat_template:
+            cmd.extend(['--chat_template', args.chat_template])
+        if args.attention_backend:
+            cmd.extend(['--attention_backend', args.attention_backend])
+        if args.disable_flashinfer_sampling:
+            cmd.append('--disable_flashinfer_sampling')
+        
+        print(f"\n1. Server command:\n   {' '.join(cmd)}")
+        
+        # Show inference command
+        inf_cmd = [
+            sys.executable, 'inference_call.py',
+            '--model_name', args.model_name,
+            '--chain_type', args.chain_type,
+            '--question_type', args.question_type,
+            '--k', str(args.k)
+        ]
+        print(f"\n2. Inference command:\n   {' '.join(inf_cmd)}")
+        print(f"\n{Colors.BRIGHT_GREEN}Dry run complete{Colors.RESET}")
+        return
     
     # Add model to utils.py
     add_local_model_to_utils(args.model_name, args.model_path, args.chat_template)

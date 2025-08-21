@@ -178,6 +178,10 @@ def build_vllm_command(model_path, port=8123, rope_scaling=None, max_model_len=N
     if attention_backend:
         env_vars.append(f"VLLM_ATTENTION_BACKEND={attention_backend}")
     
+    # Disable FlashInfer sampler if requested (for compatibility)
+    if disable_flashinfer_sampling:
+        env_vars.append("VLLM_USE_FLASHINFER_SAMPLER=0")
+    
     cmd_parts = [
         " ".join(env_vars),
         "vllm serve", 
@@ -201,9 +205,7 @@ def build_vllm_command(model_path, port=8123, rope_scaling=None, max_model_len=N
     if max_model_len:
         cmd_parts.append(f"--max_model_len {max_model_len}")
     
-    # Add compatibility flags for older CUDA/FlashInfer issues
-    if disable_flashinfer_sampling:
-        cmd_parts.append("--disable-flashinfer-sampling")
+    # Note: FlashInfer sampling is controlled via VLLM_USE_FLASHINFER_SAMPLER env var above
     
     return " \\\n        ".join(cmd_parts)
 
